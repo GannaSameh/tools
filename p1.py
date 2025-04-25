@@ -182,7 +182,7 @@ st.title("FOODmart Supermarket Analysis")
 # Load the dataset
 @st.cache_data
 def load_data():
-    file_path = "StoresData.xlsx"
+    file_path = "StoresData.xlsx"  # Ensure this matches the location of your dataset
     data = pd.read_excel(file_path, sheet_name="Stores-Data")
     return data
 
