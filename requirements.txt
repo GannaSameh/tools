@@ -1,0 +1,9 @@
+requests
+beautifulsoup4
+matplotlib
+wordcloud
+networkx
+pandas
+seaborn
+pymongo
+streamlit
