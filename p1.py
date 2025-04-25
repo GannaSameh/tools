@@ -171,22 +171,6 @@ plt.show()
 
 
 
-from pymongo import MongoClient
-
-# Connect to MongoDB
-client = MongoClient("mongodb://localhost:27017/")
-db = client["atlantis_project"]
-collection = db["processed_data"]
-
-# Insert the processed data into MongoDB
-data_to_store = {
-    "cleaned_text": cleaned_data,
-    "keyword_frequencies": keyword_frequencies,
-    "common_locations": common_locations
-}
-collection.insert_one(data_to_store)
-
-print("Processed data saved to MongoDB.")
 
 import streamlit as st
 
