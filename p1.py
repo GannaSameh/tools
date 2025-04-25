@@ -172,113 +172,145 @@ plt.show()
 
 
 import streamlit as st
-import pandas as pd
+import requests
+from bs4 import BeautifulSoup
+import re
+from collections import Counter
 import matplotlib.pyplot as plt
+from wordcloud import WordCloud
+import networkx as nx
+import pandas as pd
 import seaborn as sns
 
+# Set page title and layout
+st.set_page_config(page_title="Atlantis Analysis", layout="wide")
+
 # Title of the app
-st.title("FOODmart Supermarket Analysis")
+st.title("Atlantis Wikipedia Page Analysis")
+st.write("This app analyzes data extracted from the Wikipedia page on Atlantis.")
 
-# Load the dataset
+# Fetch and parse the Wikipedia page
 @st.cache_data
-def load_data():
-    file_path = "StoresData.xlsx"  # Ensure this matches the location of your dataset
-    data = pd.read_excel(file_path, sheet_name="Stores-Data")
-    return data
+def fetch_and_parse():
+    url = "https://en.wikipedia.org/wiki/Atlantis"
+    response = requests.get(url)
+    soup = BeautifulSoup(response.text, 'html.parser')
+    main_content = soup.find('div', {'id': 'bodyContent'}).text
+    return main_content
 
-data = load_data()
+# Data Cleaning
+@st.cache_data
+def clean_data(raw_data):
+    # Remove citations
+    cleaned_data = re.sub(r'\[\d+\]', '', raw_data)
+    # Remove extra whitespace
+    cleaned_data = re.sub(r'\s+', ' ', cleaned_data).strip()
+    return cleaned_data
 
-# Display raw data
-st.header("Raw Data")
-if st.checkbox("Show Raw Data"):
-    st.write(data)
+# Extract dates, names, and locations
+@st.cache_data
+def extract_entities(cleaned_data):
+    dates = re.findall(r'\b(?:circa\s)?\d{1,4}\s?(?:BC|AD|century)\b', cleaned_data)
+    names = re.findall(r'\b[A-Z][a-z]+\b', cleaned_data)
+    locations = re.findall(r'\b[A-Z][a-z]+(?:\s[A-Z][a-z]+)*\b', cleaned_data)
+    return dates, names, locations
 
-# Basic Statistics
-st.header("Basic Statistics")
-st.write("Number of Stores:", len(data))
-st.write("Average Sales Revenue ($M):", round(data["Sales $m"].mean(), 2))
-st.write("Average Wage Bill ($M):", round(data["Wages $m"].mean(), 2))
+# Analyze data
+@st.cache_data
+def analyze_data(cleaned_data, dates, locations):
+    # Tokenize and count words
+    words = cleaned_data.split()
+    word_counts = Counter(words)
+    keywords = ["Atlantis", "Plato", "ocean", "island"]
+    keyword_frequencies = {keyword: word_counts[keyword] for keyword in keywords}
+    common_locations = Counter(locations).most_common(5)
+    return words, word_counts, keyword_frequencies, common_locations
 
-# Distribution of Stores by Location
-st.header("Distribution of Stores by Location")
-location_counts = data["Location"].value_counts()
-fig1, ax1 = plt.subplots()
-sns.barplot(x=location_counts.index, y=location_counts.values, palette="Blues_d", ax=ax1)
-plt.title("Store Locations")
-plt.xlabel("Location")
-plt.ylabel("Count")
-st.pyplot(fig1)
+# Streamlit UI
+raw_data = fetch_and_parse()
+cleaned_data = clean_data(raw_data)
+dates, names, locations = extract_entities(cleaned_data)
+words, word_counts, keyword_frequencies, common_locations = analyze_data(cleaned_data, dates, locations)
 
-# Distribution of Stores by State
-st.header("Distribution of Stores by State")
-state_counts = data["State"].value_counts()
-fig2, ax2 = plt.subplots()
-sns.barplot(x=state_counts.index, y=state_counts.values, palette="Greens_d", ax=ax2)
-plt.title("Stores by State")
-plt.xlabel("State")
-plt.ylabel("Count")
-st.pyplot(fig2)
+# Sidebar for navigation
+st.sidebar.title("Navigation")
+section = st.sidebar.radio("Go to", ["Overview", "Keyword Frequencies", "Locations", "Word Cloud", "Date Timeline", "HTML Tags"])
 
-# Sunday Trading
-st.header("Sunday Trading")
-sunday_counts = data["Sundays"].value_counts()
-fig3, ax3 = plt.subplots()
-sns.barplot(x=sunday_counts.index, y=sunday_counts.values, palette="Oranges_d", ax=ax3)
-plt.title("Sunday Trading")
-plt.xlabel("Open on Sundays")
-plt.ylabel("Count")
-st.pyplot(fig3)
+# Overview Section
+if section == "Overview":
+    st.header("Overview")
+    st.write("This section provides an overview of the extracted data.")
+    st.write(f"**Total Words:** {len(words)}")
+    st.write("**Keyword Frequencies:**")
+    st.json(keyword_frequencies)
+    st.write("**Most Common Locations:**")
+    st.json(common_locations)
 
-# Manager Gender
-st.header("Manager Gender")
-gender_counts = data["Mng-Sex"].value_counts()
-fig4, ax4 = plt.subplots()
-sns.barplot(x=gender_counts.index, y=gender_counts.values, palette="Purples_d", ax=ax4)
-plt.title("Manager Gender")
-plt.xlabel("Gender")
-plt.ylabel("Count")
-st.pyplot(fig4)
+# Keyword Frequencies Section
+elif section == "Keyword Frequencies":
+    st.header("Keyword Frequencies")
+    fig, ax = plt.subplots(figsize=(10, 6))
+    ax.bar(keyword_frequencies.keys(), keyword_frequencies.values(), color='cornflowerblue')
+    ax.set_title("Keyword Frequencies in Atlantis Article")
+    ax.set_xlabel("Keyword")
+    ax.set_ylabel("Frequency")
+    ax.grid(axis='y')
+    st.pyplot(fig)
 
-# Home Delivery
-st.header("Home Delivery")
-home_del_counts = data["HomeDel"].value_counts()
-fig5, ax5 = plt.subplots()
-sns.barplot(x=home_del_counts.index, y=home_del_counts.values, palette="Reds_d", ax=ax5)
-plt.title("Home Delivery")
-plt.xlabel("Home Delivery")
-plt.ylabel("Count")
-st.pyplot(fig5)
+# Locations Section
+elif section == "Locations":
+    st.header("Most Common Locations")
+    labels, values = zip(*common_locations)
+    fig, ax = plt.subplots(figsize=(8, 8))
+    ax.pie(values, labels=labels, autopct='%1.1f%%', startangle=140, colors=plt.cm.Pastel1.colors)
+    ax.set_title("Top 5 Most Commonly Mentioned Locations")
+    st.pyplot(fig)
 
-# Correlation Heatmap
-st.header("Correlation Heatmap")
-numeric_data = data.select_dtypes(include=["float64", "int64"])
-corr_matrix = numeric_data.corr()
-fig6, ax6 = plt.subplots(figsize=(10, 8))
-sns.heatmap(corr_matrix, annot=True, cmap="coolwarm", ax=ax6)
-plt.title("Correlation Heatmap")
-st.pyplot(fig6)
+# Word Cloud Section
+elif section == "Word Cloud":
+    st.header("Word Cloud")
+    wordcloud = WordCloud(width=800, height=400, background_color='white').generate(cleaned_data)
+    fig, ax = plt.subplots(figsize=(10, 6))
+    ax.imshow(wordcloud, interpolation='bilinear')
+    ax.axis('off')
+    ax.set_title("Word Cloud of Cleaned Atlantis Article")
+    st.pyplot(fig)
 
-# Scatter Plot: Sales vs Wages
-st.header("Sales vs Wages")
-fig7, ax7 = plt.subplots()
-sns.scatterplot(data=data, x="Sales $m", y="Wages $m", hue="Location", palette="Set1", ax=ax7)
-plt.title("Sales vs Wages")
-plt.xlabel("Sales ($M)")
-plt.ylabel("Wages ($M)")
-st.pyplot(fig7)
+# Date Timeline Section
+elif section == "Date Timeline":
+    st.header("Date Timeline")
+    def parse_year(date_str):
+        match = re.search(r'(\d{1,4})\s?(BC|AD|century)?', date_str)
+        if match:
+            year, era = match.groups()
+            year = int(year)
+            return -year if era == "BC" else year
+        return None
 
-# Box Plot: Gross Profit by Location
-st.header("Gross Profit by Location")
-fig8, ax8 = plt.subplots()
-sns.boxplot(data=data, x="Location", y="GrossProfit", palette="Set2", ax=ax8)
-plt.title("Gross Profit by Location")
-plt.xlabel("Location")
-plt.ylabel("Gross Profit ($M)")
-st.pyplot(fig8)
+    numeric_dates = [parse_year(d) for d in dates if parse_year(d) is not None]
+    fig, ax = plt.subplots(figsize=(10, 5))
+    ax.hist(numeric_dates, bins=15, color='salmon', edgecolor='black')
+    ax.set_title("Histogram of Historical Dates Mentioned")
+    ax.set_xlabel("Year")
+    ax.set_ylabel("Frequency")
+    ax.grid(True)
+    st.pyplot(fig)
+
+# HTML Tags Section
+elif section == "HTML Tags":
+    st.header("HTML Tags Distribution")
+    tags = [tag.name for tag in BeautifulSoup(requests.get("https://en.wikipedia.org/wiki/Atlantis").text, 'html.parser').find_all()]
+    tag_counts = Counter(tags)
+    tag_df = pd.DataFrame(tag_counts.items(), columns=["Tag", "Count"]).sort_values(by="Count", ascending=False)
+    fig, ax = plt.subplots(figsize=(10, 6))
+    sns.barplot(data=tag_df.head(15), x="Count", y="Tag", hue="Tag", palette="coolwarm", legend=False)
+    ax.set_title("Top 15 Most Used HTML Tags on the Page")
+    ax.set_xlabel("Count")
+    ax.set_ylabel("HTML Tag")
+    st.pyplot(fig)
 
 # Footer
-st.markdown("---")
-st.markdown("Created with ❤️ using [Streamlit](https://streamlit.io/)")
-
+st.sidebar.markdown("---")
+st.sidebar.write("Developed with ❤️ using Streamlit")
 
 
