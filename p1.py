@@ -188,5 +188,24 @@ collection.insert_one(data_to_store)
 
 print("Processed data saved to MongoDB.")
 
+import streamlit as st
+
+# Title of the app
+st.title("Atlantis Data Analysis")
+
+# Display keyword frequencies
+st.header("Keyword Frequencies")
+st.bar_chart(keyword_frequencies)
+
+# Display most common locations
+st.header("Most Common Locations")
+fig, ax = plt.subplots()
+ax.pie(values, labels=labels, autopct='%1.1f%%', startangle=90)
+st.pyplot(fig)
+
+# Display cleaned text
+st.header("Cleaned Text")
+st.text_area("Extracted and Cleaned Data", cleaned_data, height=300)
+
 
 
